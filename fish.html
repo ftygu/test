@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>鱼类数据可视化分析系统</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --alert-color: #e74c3c;
+            --warning-color: #f39c12;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+            --purple-color: #9b59b6;
+            --teal-color: #1abc9c;
+        }
+
+
+        .chart-title {
+            color: var(--dark-color);
+            margin: 10px 0;
+            font-size: 32px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 18px;
+            margin-bottom: 25px;
+        }
+
+        .axis line, .axis path {
+            stroke: #666;
+            stroke-width: 0.5;
+        }
+
+        .axis text {
+            font-size: 12px;
+            fill: #333;
+        }
+
+        .legend-item {
+            cursor: pointer;
+            margin: 0 10px 10px 0;
+            display: inline-block;
+            white-space: nowrap;
+            padding: 8px 15px;
+            border-radius: 20px;
+            transition: all 0.3s;
+            background-color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-size: 14px;
+        }
+
+        .legend-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .legend-item.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        #tooltip {
+            position: absolute;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            pointer-events: none;
+            font-size: 14px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            min-width: 200px;
+            backdrop-filter: blur(5px);
+            z-index: 100;
+        }
+
+        .axis-label {
+            font-size: 14px;
+            fill: #333;
+            font-weight: 600;
+        }
+
+        circle {
+            opacity: 0.8;
+            transition: all 0.3s;
+            stroke-width: 0;
+        }
+
+        circle:hover {
+            stroke: #333;
+            stroke-width: 2;
+            opacity: 1;
+            transform: scale(1.05);
+        }
+
+        .control-panel {
+            text-align: center;
+            margin: 25px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        .size-control {
+            display: inline-block;
+            margin: 0 8px;
+            padding: 10px 20px;
+            border: 1px solid #ddd;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+            font-weight: 500;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .size-control:hover {
+            background-color: #f8f9fa;
+        }
+
+        .size-control.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+
+        #statistics {
+            margin: 40px auto;
+            padding: 25px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        #stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        #stats-table th, #stats-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        #stats-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        #stats-table tr:hover {
+            background-color: #f9fbfd;
+        }
+
+        svg {
+            display: block;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .action-bar {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 25px 0;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-export {
+            background: var(--secondary-color);
+            box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+        }
+
+        .btn-export:hover {
+            background: #27ae60;
+            box-shadow: 0 6px 15px rgba(46, 204, 113, 0.4);
+        }
+
+        .btn-alert {
+            background: var(--warning-color);
+            box-shadow: 0 4px 10px rgba(243, 156, 18, 0.3);
+        }
+
+        .btn-alert:hover {
+            background: #d35400;
+            box-shadow: 0 6px 15px rgba(243, 156, 18, 0.4);
+        }
+
+        .btn-purple {
+            background: var(--purple-color);
+            box-shadow: 0 4px 10px rgba(155, 89, 182, 0.3);
+        }
+
+        .btn-purple:hover {
+            background: #8e44ad;
+            box-shadow: 0 6px 15px rgba(155, 89, 182, 0.4);
+        }
+
+        .btn-teal {
+            background: var(--teal-color);
+            box-shadow: 0 4px 10px rgba(26, 188, 156, 0.3);
+        }
+
+        .btn-teal:hover {
+            background: #16a085;
+            box-shadow: 0 6px 15px rgba(26, 188, 156, 0.4);
+        }
+
+        .alert-panel {
+            background: #fff9e6;
+            border: 1px solid var(--warning-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .alert-panel h3 {
+            color: var(--warning-color);
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-item {
+            padding: 10px;
+            border-bottom: 1px solid #ffeeba;
+        }
+
+        .alert-item:last-child {
+            border-bottom: none;
+        }
+
+        .upload-container {
+            text-align: center;
+            padding: 30px;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            background: #fafafa;
+            margin: 20px 0;
+            transition: all 0.3s;
+        }
+
+        .upload-container:hover {
+            border-color: var(--primary-color);
+            background: #f0f8ff;
+        }
+
+        .upload-container.drag-over {
+            border-color: var(--secondary-color);
+            background: #f0fff4;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #bdc3c7;
+            margin-bottom: 15px;
+        }
+
+        .threshold-control {
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .threshold-item {
+            margin: 10px 0;
+        }
+
+        .threshold-item label {
+            display: inline-block;
+            width: 200px;
+            font-weight: 500;
+        }
+
+        .threshold-item input {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .feature-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--secondary-color);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .stats-summary {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            min-width: 180px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+
+        .footer {
+            text-align: center;
+            margin: 40px 0 20px;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        /* 新增数据点样式 */
+        .new-data-point {
+            stroke: #000;
+            stroke-width: 2px;
+            filter: drop-shadow(0 0 3px rgba(255,255,0,0.8));
+        }
+
+        /* 下载选项面板 */
+        .download-options {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .download-option {
+            background: #f0f4f8;
+            border: 1px solid #d1d8e0;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            width: 140px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .download-option:hover {
+            background: #e3eaf3;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .download-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .download-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .download-desc {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="chart-title">鱼类数据可视化分析</h1>
+        </div>
+
+        <div class="action-bar">
+            <button id="upload-btn" class="btn">
+                <i class="upload-icon">📁</i> 上传数据
+            </button>
+            <button id="export-btn" class="btn btn-export">导出完整数据</button>
+            <button id="download-btn" class="btn btn-purple">下载图表/表格</button>
+            <button id="check-alert-btn" class="btn btn-alert">检查异常</button>
+        </div>
+
+        <div class="download-options" id="download-options" style="display: none;">
+            <div class="download-option" id="download-scatter">
+                <span class="download-icon">📊</span>
+                <div class="download-title">下载散点图</div>
+                <div class="download-desc">JPG格式</div>
+            </div>
+            <div class="download-option" id="download-table">
+                <span class="download-icon">📋</span>
+                <div class="download-title">下载统计表格</div>
+                <div class="download-desc">CSV格式</div>
+            </div>
+        </div>
+
+        <div id="alert-area" class="alert-panel">
+            <h3>⚠️ 数据异常警告</h3>
+            <div id="alert-content"></div>
+        </div>
+
+        <div class="upload-container" id="drop-area">
+            <div class="upload-icon">📤</div>
+            <h3>上传鱼类数据CSV文件</h3>
+            <p>拖放文件到此处，或 <span style="color: var(--primary-color); font-weight: 500;">点击选择文件</span></p>
+            <p style="font-size: 14px; color: #7f8c8d;">支持格式：CSV</p>
+            <input type="file" id="file-input" accept=".csv" style="display: none;">
+        </div>
+
+        <div class="threshold-control">
+            <h3>异常检测阈值设置</h3>
+            <div class="threshold-item">
+                <label for="weight-threshold">最大重量 (g):</label>
+                <input type="number" id="weight-threshold" value="1500">
+            </div>
+            <div class="threshold-item">
+                <label for="width-threshold">最大体宽 (cm):</label>
+                <input type="number" id="width-threshold" value="15">
+            </div>
+            <div class="threshold-item">
+                <label for="length-threshold">最大长度 (cm):</label>
+                <input type="number" id="length-threshold" value="50">
+            </div>
+        </div>
+
+        <div class="stats-summary">
+            <div class="stat-card">
+                <div class="stat-label">物种数量</div>
+                <div class="stat-value" id="species-count">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">数据总数</div>
+                <div class="stat-value" id="data-count">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">平均重量 (g)</div>
+                <div class="stat-value" id="avg-weight">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">平均体宽 (cm)</div>
+                <div class="stat-value" id="avg-width">0</div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h3>选择尺寸指标</h3>
+            <div class="size-control active" data-dim="length1">Length1</div>
+            <div class="size-control" data-dim="length2">Length2</div>
+            <div class="size-control" data-dim="length3">Length3</div>
+        </div>
+
+        <div id="legend" style="text-align: center; margin: 20px 0;"></div>
+
+        <div id="tooltip"></div>
+        <svg id="chart-svg" width="1280" height="680"></svg>
+
+        <div id="statistics">
+            <h2 class="chart-title" style="text-align: center;">统计信息</h2>
+            <table id="stats-table">
+                <thead>
+                    <tr>
+                        <th>物种</th>
+                        <th>数量</th>
+                        <th>平均宽度 (cm)</th>
+                        <th>平均重量 (g)</th>
+                        <th>平均Length1(cm)</th>
+                        <th>平均Length2(cm)</th>
+                        <th>平均Length3(cm)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            <p>鱼类数据可视化分析</p>
+        </div>
+    </div>
+
+    <script>
+        // 新增状态变量
+        let currentSizeDimension = 'length1';
+        let hiddenSpecies = new Set(); // 存储被隐藏的物种
+        let processedData = []; // 存储处理后的数据
+        let rawData = []; // 存储原始数据
+        let uploadedData = []; // 存储上传的新数据
+        let combinedData = []; // 存储合并后的数据
+        let color = null; // 颜色比例尺
+        let svg = null; // SVG元素引用
+        let circles = null; // 圆点元素引用
+        let xScale, yScale; // 比例尺引用
+        let currentStatsData = []; // 存储当前统计表格数据
+
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            // 设置事件监听器
+            document.getElementById('upload-btn').addEventListener('click', function() {
+                document.getElementById('file-input').click();
+            });
+
+            document.getElementById('file-input').addEventListener('change', handleFileUpload);
+
+            document.getElementById('export-btn').addEventListener('click', exportData);
+
+            document.getElementById('download-btn').addEventListener('click', function() {
+                const options = document.getElementById('download-options');
+                options.style.display = options.style.display === 'flex' ? 'none' : 'flex';
+            });
+
+            document.getElementById('download-scatter').addEventListener('click', downloadChartAsJPG);
+            document.getElementById('download-table').addEventListener('click', downloadTable);
+
+            document.getElementById('check-alert-btn').addEventListener('click', checkDataAlerts);
+
+            // 设置拖放区域事件
+            const dropArea = document.getElementById('drop-area');
+            dropArea.addEventListener('click', () => document.getElementById('file-input').click());
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight() {
+                dropArea.classList.add('drag-over');
+            }
+
+            function unhighlight() {
+                dropArea.classList.remove('drag-over');
+            }
+
+            dropArea.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+
+            // 加载初始数据
+            loadInitialData();
+        });
+
+        // 加载初始数据
+        function loadInitialData() {
+            // 使用D3加载初始数据
+            d3.csv("Fish.csv", d3.autoType).then(data => {
+                rawData = data;
+                uploadedData = []; // 重置上传数据
+                combineData();
+                updateSummaryStats();
+            });
+        }
+
+        // 合并原始数据和上传数据
+        function combineData() {
+            // 合并数据并添加来源标识
+            combinedData = [
+                ...rawData.map(d => ({...d, source: 'original'})),
+                ...uploadedData.map(d => ({...d, source: 'uploaded'}))
+            ];
+
+            // 处理合并后的数据
+            processData(combinedData);
+        }
+
+        // 处理文件上传
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            handleFiles([file]);
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+
+            const file = files[0];
+            if (file.type !== "text/csv" && !file.name.endsWith('.csv')) {
+                alert('请上传CSV文件');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csvData = d3.csvParse(e.target.result, d3.autoType);
+                // 保存上传的数据
+                uploadedData = csvData;
+                combineData();
+                updateSummaryStats();
+                alert(`成功上传 ${csvData.length} 条数据`);
+            };
+            reader.readAsText(file);
+        }
+
+        // 处理数据
+        function processData(data) {
+            processedData = data.map(d => ({
+                Species: d.Species,
+                width: d['Width(cm)'],
+                weight: d['Weight(g)'],
+                length1: d['Length1(cm)'],
+                length2: d['Length2(cm)'],
+                length3: d['Length3(cm)'],
+                height: d['Height(cm)'],
+                source: d.source // 保留来源信息
+            })).filter(d =>
+                !isNaN(d.width) &&
+                !isNaN(d.weight) &&
+                d.width > 0 &&
+                d.weight > 0
+            );
+
+            // 更新统计表格
+            updateStatisticsTable();
+
+            // 渲染图表
+            renderChart();
+        }
+
+        // 更新统计表格
+        function updateStatisticsTable() {
+            // 新增统计数据处理
+            const speciesGroups = d3.group(processedData, d => d.Species);
+            currentStatsData = Array.from(speciesGroups, ([species, records]) => ({
+                Species: species,
+                Count: records.length,
+                AvgWidth: d3.mean(records, d => d.width),
+                AvgWeight: d3.mean(records, d => d.weight),
+                AvgLength1: d3.mean(records, d => d.length1),
+                AvgLength2: d3.mean(records, d => d.length2),
+                AvgLength3: d3.mean(records, d => d.length3)
+            }));
+
+            // 渲染统计表格
+            const statsTable = d3.select("#stats-table tbody");
+            statsTable.selectAll("tr")
+                .data(currentStatsData)
+                .join("tr")
+                .html(d => `
+                    <td>${d.Species}</td>
+                    <td>${d.Count}</td>
+                    <td>${d.AvgWidth.toFixed(2)}</td>
+                    <td>${d.AvgWeight.toFixed(2)}</td>
+                    <td>${d.AvgLength1.toFixed(2)}</td>
+                    <td>${d.AvgLength2.toFixed(2)}</td>
+                    <td>${d.AvgLength3.toFixed(2)}</td>
+                `);
+        }
+
+        // 渲染图表
+        function renderChart() {
+            // 清除现有图表
+            d3.select("#chart-svg").selectAll("*").remove();
+
+            if (processedData.length === 0) return;
+
+            // 计算点的大小
+            const sizeValues = processedData.map(d => d.length1);
+            const sizeExtent = d3.extent(sizeValues);
+
+            // 设置比例尺
+            const width = 1280, height = 680;
+            const margin = { top: 40, right: 50, bottom: 60, left: 70 };
+
+            // X轴改为Width
+            xScale = d3.scaleLinear()
+                .domain(d3.extent(processedData, d => d.width))
+                .range([margin.left, width - margin.right])
+                .nice();
+
+            // Y轴改为Weight
+            yScale = d3.scaleLinear()
+                .domain(d3.extent(processedData, d => d.weight))
+                .range([height - margin.bottom, margin.top])
+                .nice();
+
+            // 改为统一使用sizeScale
+            // 动态计算初始size比例尺
+            const initialSizeValues = processedData.map(d => d[currentSizeDimension]);
+            const size = d3.scaleSqrt()
+                .domain(d3.extent(initialSizeValues))
+                .range([3, 25]);
+
+            color = d3.scaleOrdinal()
+                .domain(Array.from(new Set(processedData.map(d => d.Species))))
+                .range(d3.schemeTableau10);
+
+            // 创建SVG画布
+            svg = d3.select("#chart-svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            circles = svg.selectAll("circle")
+                .data(processedData)
+                .join("circle")
+                .attr("cx", d => xScale(d.width))
+                .attr("cy", d => yScale(d.weight))
+                .attr("r", d => size(d[currentSizeDimension]))  // 动态属性
+                .style("fill", d => color(d.Species))
+                .style("opacity", d => hiddenSpecies.has(d.Species) ? 0 : 0.8) // 初始设置透明度
+                .classed("new-data-point", d => d.source === 'uploaded') // 为新数据点添加特殊样式
+                .on("mouseover", showTooltip)
+                .on("mouseout", hideTooltip);
+
+            // 绘制坐标轴
+            svg.append("g")
+                .attr("class", "x-axis")
+                .attr("transform", `translate(0,${height - margin.bottom})`)
+                .call(d3.axisBottom(xScale))
+                .append("text")
+                .attr("class", "axis-label")
+                .attr("x", width/2)
+                .attr("y", 35)
+                .style("text-anchor", "middle")
+                .text("体宽 Width (cm)");  // 修改X轴标签
+
+            svg.append("g")
+                .attr("class", "y-axis")
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(d3.axisLeft(yScale))
+                .append("text")
+                .attr("class", "axis-label")
+                .attr("transform", "rotate(-90)")
+                .attr("x", -height/2)
+                .attr("y", -50)
+                .style("text-anchor", "middle")
+                .text("重量 Weight (g)");  // 修改Y轴标签
+
+            // 创建图例 - 修复点：确保图例初始状态正确
+            const legend = d3.select("#legend")
+                .selectAll(".legend-item")
+                .data(color.domain())
+                .join("div")
+                .attr("class", d =>
+                    `legend-item ${hiddenSpecies.has(d) ? '' : 'active'}`
+                )
+                .on("click", toggleVisibility);
+
+            legend.html("")
+                .each(function(d) {
+                    const item = d3.select(this);
+                    item.append("span")
+                        .style("display", "inline-block")
+                        .style("width", "14px")
+                        .style("height", "14px")
+                        .style("background-color", color(d))
+                        .style("margin-right", "6px")
+                        .style("border-radius", "3px");
+
+                    item.append("span")
+                        .text(d)
+                        .style("font-size", "14px")
+                        .style("color", "#444");
+                });
+
+            // 添加尺寸控制事件
+            d3.selectAll(".size-control").on("click", function() {
+                // 切换active状态
+                d3.selectAll(".size-control").classed("active", false);
+                d3.select(this).classed("active", true);
+
+                // 更新当前尺寸维度
+                currentSizeDimension = d3.select(this).attr("data-dim");
+
+                // 过滤可见数据（排除隐藏物种）
+                const visibleData = processedData.filter(d => !hiddenSpecies.has(d.Species));
+
+                // 处理空数据集的情况
+                const safeExtent = (data) => data.length > 0 ? d3.extent(data) : [0, 1];
+
+                // 更新比例尺domain（基于可见数据）
+                const newSizeValues = visibleData.map(d => d[currentSizeDimension]);
+                size.domain(safeExtent(newSizeValues));
+
+                // 更新所有圆点的半径（包括隐藏的，但视觉上不可见）
+                circles.transition()
+                    .duration(300)
+                    .attr("r", d => size(d[currentSizeDimension]));
+            });
+        }
+
+        // 交互功能
+        function showTooltip(event, d) {
+            // 修复点：如果该点被隐藏，则不显示工具提示
+            if (hiddenSpecies.has(d.Species)) {
+                return;
+            }
+
+            d3.select(this)
+                .style("opacity", 1)
+                .style("stroke", "#333");
+
+            d3.select("#tooltip")
+                .html(`
+                    <div style="margin-bottom:8px;font-weight:bold;color:${color(d.Species)};font-size:16px;">
+                        ${d.Species} ${d.source === 'uploaded' ? '<span style="background:#ff0;color:#000;padding:2px 5px;border-radius:3px;font-size:12px;">新数据</span>' : ''}
+                    </div>
+                    <div style="display: grid; grid-template-columns: auto auto; gap: 5px;">
+                        <div>体宽:</div><div>${d.width.toFixed(2)} cm</div>
+                        <div>重量:</div><div>${d.weight.toFixed(2)} g</div>
+                        <div>Length1:</div><div>${d.length1.toFixed(2)} cm</div>
+                        <div>Length2:</div><div>${d.length2.toFixed(2)} cm</div>
+                        <div>Length3:</div><div>${d.length3.toFixed(2)} cm</div>
+                        <div>来源:</div><div>${d.source === 'uploaded' ? '上传数据' : '原始数据'}</div>
+                    </div>
+                `)
+                .style("left", `${event.pageX + 15}px`)
+                .style("top", `${event.pageY - 15}px`)
+                .style("opacity", 1);
+        }
+
+        function hideTooltip() {
+            // 修复点：如果该点被隐藏，则不处理
+            if (hiddenSpecies.has(d3.select(this).datum().Species)) {
+                return;
+            }
+
+            d3.select(this)
+                .style("opacity", 0.8)
+                .style("stroke", "none");
+            d3.select("#tooltip").style("opacity", 0);
+        }
+
+        function toggleVisibility(event, s) {
+            // 修复点：直接根据当前隐藏状态切换
+            if (hiddenSpecies.has(s)) {
+                hiddenSpecies.delete(s);
+            } else {
+                hiddenSpecies.add(s);
+            }
+
+            // 更新当前图例项的状态
+            d3.select(this).classed("active", !hiddenSpecies.has(s));
+
+            // 过滤可见数据
+            const visibleData = processedData.filter(d => !hiddenSpecies.has(d.Species));
+
+            // 安全处理空数据集
+            const safeExtent = (data, accessor) =>
+                data.length > 0 ? d3.extent(data, accessor) : [0, 1];
+
+            // 更新坐标轴domain
+            xScale.domain(safeExtent(visibleData, d => d.width)).nice();
+            yScale.domain(safeExtent(visibleData, d => d.weight)).nice();
+
+            // 更新坐标轴显示（带过渡动画）
+            svg.select(".x-axis")
+                .transition()
+                .duration(300)
+                .call(d3.axisBottom(xScale).tickSizeOuter(0));
+
+            svg.select(".y-axis")
+                .transition()
+                .duration(300)
+                .call(d3.axisLeft(yScale).tickSizeOuter(0));
+
+            // 更新所有数据点的位置和透明度
+            circles.transition()
+                .duration(300)
+                .attr("cx", d => xScale(d.width))
+                .attr("cy", d => yScale(d.weight))
+                .style("opacity", d => hiddenSpecies.has(d.Species) ? 0 : 0.8);
+        }
+
+        // 导出完整数据
+        function exportData() {
+            if (combinedData.length === 0) {
+                alert("没有数据可导出");
+                return;
+            }
+
+            // 创建CSV内容
+            const headers = ["Species", "Width(cm)", "Weight(g)", "Length1(cm)", "Length2(cm)", "Length3(cm)", "Height(cm)"];
+            const csvContent = [
+                headers.join(","),
+                ...combinedData.map(d =>
+                    [d.Species, d['Width(cm)'], d['Weight(g)'], d['Length1(cm)'],
+                     d['Length2(cm)'], d['Length3(cm)'], d['Height(cm)']].join(",")
+                )
+            ].join("\n");
+
+            // 创建下载链接
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "combined_fish_data.csv");
+            link.style.visibility = "hidden";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 下载统计表格
+        function downloadTable() {
+            if (currentStatsData.length === 0) {
+                alert("没有统计数据可下载");
+                return;
+            }
+
+            // 创建CSV内容
+            const headers = ["物种", "数量", "平均宽度(cm)", "平均重量(g)", "平均Length1(cm)", "平均Length2(cm)", "平均Length3(cm)"];
+            const csvContent = [
+                headers.join(","),
+                ...currentStatsData.map(d => [
+                    d.Species,
+                    d.Count,
+                    d.AvgWidth.toFixed(2),
+                    d.AvgWeight.toFixed(2),
+                    d.AvgLength1.toFixed(2),
+                    d.AvgLength2.toFixed(2),
+                    d.AvgLength3.toFixed(2)
+                ].join(","))
+            ].join("\n");
+
+            // 创建下载链接
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "fish_statistics.csv");
+            link.style.visibility = "hidden";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // 隐藏下载选项
+            document.getElementById('download-options').style.display = 'none';
+        }
+
+        // 下载散点图为JPG格式
+        function downloadChartAsJPG() {
+            // 创建包含图表和图例的容器
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.left = '-10000px';
+            container.style.top = '0';
+            container.style.width = '1300px';
+            container.style.backgroundColor = 'white';
+            container.style.padding = '20px';
+            container.style.borderRadius = '10px';
+            container.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+
+            // 克隆图表区域
+            const chartClone = document.getElementById('chart-svg').cloneNode(true);
+            chartClone.style.display = 'block';
+            chartClone.style.margin = '0 auto';
+
+            // 克隆图例
+            const legendClone = document.getElementById('legend').cloneNode(true);
+            legendClone.style.textAlign = 'center';
+            legendClone.style.margin = '20px 0';
+
+            // 添加标题
+            const title = document.createElement('h2');
+            title.textContent = '鱼类数据可视化分析';
+            title.style.textAlign = 'center';
+            title.style.color = '#2c3e50';
+            title.style.marginBottom = '10px';
+
+            // 添加副标题
+            const subtitle = document.createElement('div');
+            subtitle.textContent = '';
+            subtitle.style.textAlign = 'center';
+            subtitle.style.color = '#7f8c8d';
+            subtitle.style.marginBottom = '20px';
+
+            // 添加到容器
+            container.appendChild(title);
+            container.appendChild(subtitle);
+            container.appendChild(chartClone);
+            container.appendChild(legendClone);
+
+            document.body.appendChild(container);
+
+            // 使用html2canvas转换为图片
+            html2canvas(container, {
+                scale: 2, // 提高分辨率
+                backgroundColor: '#f5f7fa',
+                useCORS: true
+            }).then(canvas => {
+                // 转换为JPG
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+                // 创建下载链接
+                const link = document.createElement('a');
+                link.download = 'fish_visualization.jpg';
+                link.href = imgData;
+                link.click();
+
+                // 移除临时容器
+                document.body.removeChild(container);
+
+                // 隐藏下载选项
+                document.getElementById('download-options').style.display = 'none';
+            });
+        }
+
+        // 检查数据异常
+        function checkDataAlerts() {
+            if (processedData.length === 0) {
+                alert("没有数据可分析");
+                return;
+            }
+
+            const weightThreshold = parseFloat(document.getElementById('weight-threshold').value) || 1500;
+            const widthThreshold = parseFloat(document.getElementById('width-threshold').value) || 15;
+            const lengthThreshold = parseFloat(document.getElementById('length-threshold').value) || 50;
+
+            const alerts = [];
+
+            // 检查异常值
+            processedData.forEach(d => {
+                if (d.weight > weightThreshold) {
+                    alerts.push({
+                        type: "weight",
+                        value: d.weight,
+                        threshold: weightThreshold,
+                        species: d.Species,
+                        message: `重量异常: ${d.Species} (${d.weight.toFixed(2)}g > ${weightThreshold}g)`
+                    });
+                }
+
+                if (d.width > widthThreshold) {
+                    alerts.push({
+                        type: "width",
+                        value: d.width,
+                        threshold: widthThreshold,
+                        species: d.Species,
+                        message: `体宽异常: ${d.Species} (${d.width.toFixed(2)}cm > ${widthThreshold}cm)`
+                    });
+                }
+
+                if (d.length1 > lengthThreshold || d.length2 > lengthThreshold || d.length3 > lengthThreshold) {
+                    const maxLength = Math.max(d.length1, d.length2, d.length3);
+                    alerts.push({
+                        type: "length",
+                        value: maxLength,
+                        threshold: lengthThreshold,
+                        species: d.Species,
+                        message: `长度异常: ${d.Species} (长度值 ${maxLength.toFixed(2)}cm > ${lengthThreshold}cm)`
+                    });
+                }
+            });
+
+            // 更新报警显示
+            const alertArea = document.getElementById('alert-area');
+            const alertContent = document.getElementById('alert-content');
+
+            if (alerts.length === 0) {
+                alertArea.style.display = 'none';
+                alert("未检测到数据异常");
+            } else {
+                alertArea.style.display = 'block';
+                alertContent.innerHTML = '';
+
+                alerts.slice(0, 10).forEach(alert => {
+                    const div = document.createElement('div');
+                    div.className = 'alert-item';
+                    div.innerHTML = `<strong>⚠️ ${alert.message}</strong>`;
+                    alertContent.appendChild(div);
+                });
+
+                if (alerts.length > 10) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.className = 'alert-item';
+                    moreDiv.innerHTML = `<em>... 还有 ${alerts.length - 10} 条异常未显示</em>`;
+                    alertContent.appendChild(moreDiv);
+                }
+            }
+        }
+
+        // 更新摘要统计信息
+        function updateSummaryStats() {
+            if (processedData.length === 0) return;
+
+            // 计算物种数量
+            const speciesCount = new Set(processedData.map(d => d.Species)).size;
+            document.getElementById('species-count').textContent = speciesCount;
+
+            // 数据总数
+            document.getElementById('data-count').textContent = processedData.length;
+
+            // 平均重量
+            const avgWeight = d3.mean(processedData, d => d.weight);
+            document.getElementById('avg-weight').textContent = avgWeight ? avgWeight.toFixed(2) : '0';
+
+            // 平均体宽
+            const avgWidth = d3.mean(processedData, d => d.width);
+            document.getElementById('avg-width').textContent = avgWidth ? avgWidth.toFixed(2) : '0';
+        }
+    </script>
+</body>
+</html>
